@@ -1,0 +1,19 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  mix:
+    runs-on: ubuntu-latest
+    services:
+      plausible:
+        image: plausible/analytics:v1.5.0-rc.1
+        ports:
+          - 8000:8000
+
+    steps:
+      - uses: actions/checkout@v3
+      - run: curl localhost:8000 -v
