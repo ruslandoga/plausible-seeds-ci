@@ -1,19 +1,59 @@
 name: ci
 
 on:
-  pull_request:
   push:
     branches: [master]
 
 jobs:
-  mix:
+  plausible:
     runs-on: ubuntu-latest
+
     services:
-      plausible:
-        image: plausible/analytics:v1.5.0-rc.1
+      postgres:
+        image: postgres:15-alpine
         ports:
-          - 8000:8000
+          - 5432:5432
+        env:
+          POSTGRES_PASSWORD: postgres
+          options: >-
+            --health-cmd pg_isready
+            --health-interval 10s
+            --health-timeout 5s
+            --health-retries 5
+
+      clickhouse:
+        image: clickhouse/clickhouse-server:22-alpine
+        ports:
+          - 8123:8123
+        env:
+          options: >-
+            --health-cmd nc -zw3 localhost 8124
+            --health-interval 10s
+            --health-timeout 5s
+            --health-retries 5
+
+    env:
+      PLAUSIBLE_IMAGE: plausible/analytics:v1.5.0-rc.1
+      PLAUSIBLE_OPTS: --env-file ci/plausible-conf.env --network host
 
     steps:
       - uses: actions/checkout@v3
-      - run: curl localhost:8000 -v
+
+      - name: plausible/createdb
+        run: docker run $PLAUSIBLE_OPTS $PLAUSIBLE_IMAGE bin/plausible eval Plausible.Release.createdb
+
+      - name: plausible/migrate
+        run: docker run $PLAUSIBLE_OPTS $PLAUSIBLE_IMAGE bin/plausible eval Plausible.Release.migrate
+
+      - name: plausible/seed (with custom script)
+        run: |
+          docker run -v "$(pwd)"/ci/seeds.exs:/app/lib/plausible-0.0.1/priv/repo/seeds.exs \
+            $PLAUSIBLE_OPTS $PLAUSIBLE_IMAGE bin/plausible eval Plausible.Release.seed
+
+      - name: plausible/run
+        run: docker run -d $PLAUSIBLE_OPTS $PLAUSIBLE_IMAGE
+
+      - run: sleep 5
+
+      - name: curl plausible
+        run: curl localhost:8000
