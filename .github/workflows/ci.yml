@@ -33,7 +33,7 @@ jobs:
             --health-retries 5
 
     env:
-      PLAUSIBLE_IMAGE: plausible/analytics:v1.5.0-rc.1
+      PLAUSIBLE_IMAGE: plausible/analytics:v1.5.1
       PLAUSIBLE_OPTS: --env-file ci/plausible-conf.env --network host
 
     steps:
